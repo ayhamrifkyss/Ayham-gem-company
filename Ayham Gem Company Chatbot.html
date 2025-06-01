@@ -1,0 +1,228 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ayham Gem Company Chatbot</title>
+  <style>
+    .chatbot-container {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      width: 300px;
+      height: 400px;
+      background-color: #fff;
+      border-radius: 10px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+      display: flex;
+      flex-direction: column;
+      font-family: Arial, sans-serif;
+    }
+    .chatbot-header {
+      background-color: #2E8B57;
+      color: white;
+      padding: 10px;
+      border-radius: 10px 10px 0 0;
+      text-align: center;
+      font-size: 16px;
+    }
+    .chatbot-messages {
+      flex: 1;
+      padding: 10px;
+      overflow-y: auto;
+      background-color: #f9f9f9;
+    }
+    .message {
+      margin: 5px 0;
+      padding: 8px;
+      border-radius: 5px;
+      max-width: 80%;
+    }
+    .bot-message {
+      background-color: #2E8B57;
+      color: white;
+      margin-left: auto;
+    }
+    .user-message {
+      background-color: #e0e0e0;
+      color: black;
+      margin-right: auto;
+    }
+    .chatbot-input {
+      display: flex;
+      padding: 10px;
+      border-top: 1px solid #ddd;
+    }
+    .chatbot-input input {
+      flex: 1;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      outline: none;
+    }
+    .chatbot-input button {
+      margin-left: 5px;
+      padding: 8px 12px;
+      background-color: #2E8B57;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    .chatbot-input button:hover {
+      background-color: #267347;
+    }
+    .option-button {
+      display: block;
+      margin: 5px 10px;
+      padding: 8px;
+      background-color: #2E8B57;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      text-align: left;
+    }
+    .option-button:hover {
+      background-color: #267347;
+    }
+  </style>
+</head>
+<body>
+  <div class="chatbot-container">
+    <div class="chatbot-header">Ayham Gem Company 💎</div>
+    <div class="chatbot-messages" id="chatMessages"></div>
+    <div class="chatbot-input">
+      <input type="text" id="userInput" placeholder="Type your message...">
+      <button onclick="sendMessage()">Send</button>
+    </div>
+  </div>
+
+  <script>
+    const chatMessages = document.getElementById('chatMessages');
+    const userInput = document.getElementById('userInput');
+    let userName = '';
+    let step = 1;
+
+    function addMessage(text, sender) {
+      const message = document.createElement('div');
+      message.classList.add('message', sender === 'bot' ? 'bot-message' : 'user-message');
+      message.textContent = text;
+      chatMessages.appendChild(message);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    function addOptionButton(text, nextStep, action = null, url = null) {
+      const button = document.createElement('button');
+      button.classList.add('option-button');
+      button.textContent = text;
+      button.onclick = () => {
+        addMessage(text, 'user');
+        if (action === 'redirect' && url) {
+          addMessage(`Redirecting to ${url}`, 'bot');
+          window.location.href = url;
+        } else if (action === 'handoff') {
+          addMessage('Connecting you to a human agent. Please wait.', 'bot');
+        } else {
+          handleStep(nextStep, text);
+        }
+        button.remove();
+      };
+      chatMessages.appendChild(button);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    function handleStep(currentStep, userResponse = '') {
+      if (currentStep === 1) {
+        addMessage('Welcome to Ayham Gem Company! 💎 What\'s your name?', 'bot');
+        step = 2;
+      } else if (currentStep === 2) {
+        userName = userResponse.trim();
+        if (!userName) userName = 'Guest';
+        addMessage(`Nice to meet you, ${userName}! Are you looking for a specific gemstone or need help choosing one?`, 'bot');
+        addOptionButton('Explore Gemstones', 3);
+        addOptionButton('Get Recommendations', 4);
+        addOptionButton('Contact Support', 5, 'handoff');
+        step = 3;
+      } else if (currentStep === 3) {
+        addMessage(`We offer gemstones like diamonds, sapphires, emeralds, and more. Which one interests you?`, 'bot');
+        step = 6;
+      } else if (currentStep === 4) {
+        addMessage(`Tell me about your preferences (e.g., color, budget, occasion), and I\'ll recommend the perfect gem!`, 'bot');
+        step = 6;
+      } else if (currentStep === 5) {
+        addMessage('Connecting you to a human agent from Ayham Gem Company. Please wait.', 'bot');
+      } else if (currentStep === 6) {
+        const gem = userResponse.toLowerCase();
+        addMessage(`Great choice, ${userName}! Would you like to see our ${gem} collection or learn more?`, 'bot');
+        addOptionButton('View Collection', null, 'redirect', `https://ayhamgemcompany.com/collection/${gem}`);
+        addOptionButton('Learn More', 7);
+        step = 7;
+      } else if (currentStep === 7) {
+        addMessage(`Here's some info about ${userResponse.toLowerCase()}: [Insert gemstone details]. Want to explore more or proceed to purchase?`, 'bot');
+        addOptionButton('Explore More', 3);
+        addOptionButton('Purchase', null, 'redirect', `https://ayhamgemcompany.com/purchase/${userResponse.toLowerCase()}`);
+      }
+    }
+
+    function sendMessage() {
+      const text = userInput.value.trim();
+      if (!text) return;
+      addMessage(text, 'user');
+      userInput.value = '';
+
+      if (text.toLowerCase().includes('talk to human') || text.toLowerCase().includes('speak to someone')) {
+        handleStep(5);
+      } else {
+        handleStep(step, text);
+      }
+    }
+
+    userInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') sendMessage();
+    });
+
+    // Initialize chatbot
+    handleStep(1);
+  </script>
+</body>
+</html>
